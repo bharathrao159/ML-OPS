@@ -1,0 +1,100 @@
+### Step 1: Train the Model and Track with MLflow
+
+import mlflow
+import mlflow.sklearn
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+# Load dataset
+data = pd.read_csv('data.csv')
+if 'target' not in data.columns:
+    raise ValueError("The dataset must contain a 'target' column.")
+X = data.drop(columns=['target'])
+y = data['target']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Start MLflow experiment
+mlflow.set_experiment("mlops_pipeline")
+with mlflow.start_run():
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+    predictions = model.predict(X_test)
+    acc = accuracy_score(y_test, predictions)
+    
+    # Log parameters and metrics
+    mlflow.log_param("n_estimators", 100)
+    mlflow.log_metric("accuracy", acc)
+    
+    # Log model
+    mlflow.sklearn.log_model(model, "random_forest_model")
+    print(f"Model accuracy: {acc}")
+
+### Step 2: Build Docker Image for Deployment
+
+# Create Dockerfile
+DOCKERFILE = '''
+FROM python:3.8
+WORKDIR /app
+COPY requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+COPY model.pkl model.pkl
+COPY app.py app.py
+CMD ["python", "app.py"]
+'''
+with open("Dockerfile", "w") as file:
+    file.write(DOCKERFILE)
+
+# Create Flask API for Model Deployment
+APP_PY = '''
+from flask import Flask, request, jsonify
+import pickle
+import numpy as np
+
+app = Flask(__name__)
+try:
+    model = pickle.load(open("model.pkl", "rb"))
+except FileNotFoundError:
+    raise FileNotFoundError("The model file 'model.pkl' was not found. Ensure the model is trained and saved.")
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        data = request.get_json()
+        features = data.get('features')
+        if features is None:
+            return jsonify({'error': 'Missing features in request'}), 400
+        prediction = model.predict(np.array(features).reshape(1, -1))
+        return jsonify({'prediction': int(prediction[0])})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+'''
+with open("app.py", "w") as file:
+    file.write(APP_PY)
+
+### Step 3: Automate Deployment with CI/CD (GitHub Actions)
+
+GITHUB_ACTIONS = '''
+name: Deploy Model
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Build Docker Image
+        run: |
+          docker build -t my_ml_model .
+          docker run -d -p 5000:5000 my_ml_model
+'''
+with open(".github/workflows/deploy.yml", "w") as file:
+    file.write(GITHUB_ACTIONS)
+
+print("MLOps pipeline setup complete!")
