@@ -1,4 +1,4 @@
-### Step 1: Train the Model and Track with MLflow
+# Step 1: Train the Model and Track with MLflow
 
 import mlflow
 import mlflow.sklearn
@@ -32,7 +32,7 @@ with mlflow.start_run():
     mlflow.sklearn.log_model(model, "random_forest_model")
     print(f"Model accuracy: {acc}")
 
-### Step 2: Build Docker Image for Deployment
+# Step 2: Build Docker Image for Deployment
 
 # Create Dockerfile
 DOCKERFILE = '''
@@ -77,7 +77,7 @@ if __name__ == '__main__':
 with open("app.py", "w") as file:
     file.write(APP_PY)
 
-### Step 3: Automate Deployment with CI/CD (GitHub Actions)
+# Step 3: Automate Deployment with CI/CD (GitHub Actions)
 
 GITHUB_ACTIONS = '''
 name: Deploy Model
@@ -93,7 +93,7 @@ jobs:
         run: |
           docker build -t my_ml_model .
           docker run -d -p 5000:5000 my_ml_model
-'''
+...
 with open(".github/workflows/deploy.yml", "w") as file:
     file.write(GITHUB_ACTIONS)
 
